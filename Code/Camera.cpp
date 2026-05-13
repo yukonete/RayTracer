@@ -63,8 +63,8 @@ void Camera::init() {
     pixel_samples_scale = 1.0f / samples_per_pixel;
 }
 
-Image Camera::render(const Hittable &world, int thread_count) const {
-    auto result = Image{.data = std::vector<u8>(image_height * image_width * 3), .image_width = image_width, .image_height = image_height};
+RenderedFrame Camera::render(const Hittable &world, int thread_count) const {
+    auto result = RenderedFrame{.data = std::vector<u8>(image_height * image_width * 3), .image_width = image_width, .image_height = image_height};
     render_to_buffer_multithreaded(result.data, thread_count, world);
     return result;
 }

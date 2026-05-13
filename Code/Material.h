@@ -2,15 +2,16 @@
 
 #include "Ray.h"
 #include "Hittable.h"
+#include "Texture.h"
 
 struct Material {
     virtual bool scatter(const Ray &r_in, const HitRecord &rec, Color &attenuation, Ray &scattered) const = 0;
 };
 
 struct Lambertian : public Material {
-    Color albedo;
+    const Texture *texture = nullptr;
 
-    Lambertian(const Color &albedo) : albedo{albedo} {}
+    Lambertian(Texture *texture) : texture{texture} {}
 
     bool scatter(const Ray &r_in, const HitRecord &rec, Color &attenuation, Ray &scattered) const override {
         auto scatter_direction = rec.normal + random_unit_vector();
@@ -19,7 +20,7 @@ struct Lambertian : public Material {
         }
 
         scattered = Ray{rec.point, scatter_direction, r_in.time};
-        attenuation = albedo;
+        attenuation = texture->value(rec.u, rec.v, rec.point);
         return true;
     }
 };

@@ -10,7 +10,9 @@ struct HitRecord {
 	Vec3 point;
 	Vec3 normal; // Normalized
 	f32 t = 0.0f;
-	Material *material = nullptr;
+	f32 u = 0.0f;
+	f32 v = 0.0f;
+	const Material *material = nullptr;
 	bool front_face = false;
 
 	void set_face_normal(const Ray &ray, const Vec3 &outward_normal) {

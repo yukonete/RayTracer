@@ -7,7 +7,7 @@
 #include "Hittable.h"
 
 
-struct Image {
+struct RenderedFrame {
     std::vector<u8> data;
     int image_width = 0;
     int image_height = 0;
@@ -29,7 +29,7 @@ struct Camera {
     f32 focus_dist = 10.0f;    // Distance from camera lookfrom point to plane of perfect focus
 
     void init();
-    Image render(const Hittable &world, int thread_count = 1) const;
+    RenderedFrame render(const Hittable &world, int thread_count = 1) const;
     void render_to_buffer_multithreaded(std::span<u8> buffer, int thread_count, const Hittable &world) const;
 	void render_to_buffer(std::span<u8> buffer, const Hittable &world) const;
     Ray get_ray(int x, int y) const;

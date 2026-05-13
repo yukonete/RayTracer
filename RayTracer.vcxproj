@@ -139,7 +139,7 @@
     <ClCompile Include="Code\Camera.cpp" />
     <ClCompile Include="Code\Interval.cpp" />
     <ClCompile Include="Code\Main.cpp" />
-    <ClCompile Include="Code\stb_image_write_impl.cpp" />
+    <ClCompile Include="Code\stb_image_impl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Code\AABB.h" />
@@ -154,6 +154,7 @@
     <ClInclude Include="Code\RtWeekend.h" />
     <ClInclude Include="Code\Sphere.h" />
     <ClInclude Include="Code\stb_image_write.h" />
+    <ClInclude Include="Code\Texture.h" />
     <ClInclude Include="Code\Vec3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

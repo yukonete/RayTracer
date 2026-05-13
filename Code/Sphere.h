@@ -10,16 +10,16 @@ struct Material;
 struct Sphere : public Hittable {
 	Ray center;
 	f32 radius = 0.0f;
-    Material *material = nullptr;
+    const Material *material = nullptr;
     AABB bbox;
 
     Sphere() {};
-    Sphere(const Vec3 &c, f32 r, Material* material) : 
+    Sphere(const Vec3 &c, f32 r, const Material* material) : 
         center{c, Vec3{0.0}}, radius{std::fmax(0.0f, r)}, material{material} {
         auto radius_vec = Vec3{r};
         bbox = AABB{c - radius_vec, c + radius_vec};
     }
-    Sphere(const Vec3 &c, const Vec3 &c2, f32 r, Material* material) : 
+    Sphere(const Vec3 &c, const Vec3 &c2, f32 r, const Material* material) : 
         center{c, c2 - c}, radius{std::fmax(0.0f, r)}, material{material} {
         auto radius_vec = Vec3{r};
         auto box1 = AABB{center.at(0.0f) - radius_vec, center.at(0.0f) + radius_vec};
@@ -56,7 +56,17 @@ struct Sphere : public Hittable {
         record.point = ray.at(record.t);
         auto outward_normal = (record.point - current_center) / radius;
         record.set_face_normal(ray, outward_normal);
+        get_sphere_uv(outward_normal, record.u, record.v);
         record.material = material;
         return true;
 	};
+
+    // Point should be in unit sphere
+    static void get_sphere_uv(const Vec3 &point, f32 &u, f32 &v) {
+        auto theta = std::acos(-point.y);
+        auto phi = std::atan2(-point.z, point.x) + pi;
+        
+        u = phi / (2.0f * pi);
+        v = theta / pi;
+    }
 };
