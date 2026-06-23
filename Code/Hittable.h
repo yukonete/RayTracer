@@ -28,4 +28,5 @@ struct HitRecord {
 struct Hittable {
 	virtual bool hit(const Ray &ray, Interval t, HitRecord& record) const = 0;
 	virtual const AABB& bounding_box() const = 0;
+	virtual ~Hittable() = default;
 };

@@ -32,39 +32,42 @@ static Color ray_color(const Ray &r, int depth, const Hittable &world) {
     return (1.0f-a)*Color{1.0f, 1.0f, 1.0f} + a*Color{0.5f, 0.7f, 1.0f};
 }
 
+Camera::Camera() {}
+Camera::Camera(const Camera::Config &config) : config{config} {}
+
 void Camera::init() {
-    image_height = static_cast<int>(image_width / aspect_ratio);
+    image_height = static_cast<int>(config.image_width / config.aspect_ratio);
 	if (image_height < 1) {
 		image_height = 1;
 	}
 
-    auto theta = degrees_to_radians(vertical_fov);
+    auto theta = degrees_to_radians(config.vertical_fov);
     auto h = std::tanf(theta/2.0f);
-    auto viewport_heigth = 2.0f * h * focus_dist;
-    auto viewport_width = viewport_heigth * (static_cast<f32>(image_width)/image_height);
+    auto viewport_heigth = 2.0f * h * config.focus_dist;
+    auto viewport_width = viewport_heigth * (static_cast<f32>(config.image_width)/image_height);
 
-    auto w = normalize(origin - lookat);
-    auto u = normalize(cross(up, w));
+    auto w = normalize(config.origin - config.lookat);
+    auto u = normalize(cross(config.up, w));
     auto v = cross(w, u);
 
     auto viewport_u = u * viewport_width;
     auto viewport_v = -v * viewport_heigth;
 
-    pixel_delta_u = viewport_u / static_cast<f32>(image_width);
+    pixel_delta_u = viewport_u / static_cast<f32>(config.image_width);
     pixel_delta_v = viewport_v / static_cast<f32>(image_height);
 
-    auto viewport_upper_left = origin - (focus_dist * w) - viewport_u/2 - viewport_v/2;
+    auto viewport_upper_left = config.origin - (config.focus_dist * w) - viewport_u/2 - viewport_v/2;
     pixel00_location = viewport_upper_left + 0.5f * (pixel_delta_u + pixel_delta_v);
 
-    auto defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle/2.0f));
+    auto defocus_radius = config.focus_dist * std::tan(degrees_to_radians(config.defocus_angle/2.0f));
     defocus_disk_u = u * defocus_radius;
     defocus_disk_v = v * defocus_radius;
 
-    pixel_samples_scale = 1.0f / samples_per_pixel;
+    pixel_samples_scale = 1.0f / config.samples_per_pixel;
 }
 
 RenderedFrame Camera::render(const Hittable &world, int thread_count) const {
-    auto result = RenderedFrame{.data = std::vector<u8>(image_height * image_width * 3), .image_width = image_width, .image_height = image_height};
+    auto result = RenderedFrame{.data = std::vector<u8>(image_height * config.image_width * 3), .image_width = config.image_width, .image_height = image_height};
     render_to_buffer_multithreaded(result.data, thread_count, world);
     return result;
 }
@@ -75,7 +78,7 @@ void Camera::render_to_buffer_multithreaded(std::span<u8> buffer, int thread_cou
         return;
     }
 
-    auto image_size = image_height * image_width * 3;      
+    auto image_size = image_height * config.image_width * 3;      
     auto images = std::vector<std::vector<u8>>(thread_count);
     for (int imageIndex = 0; imageIndex < images.size(); ++imageIndex) {
         images.at(imageIndex).resize(image_size);
@@ -127,8 +130,7 @@ void Camera::render_to_buffer(std::span<u8> buffer, const Hittable &world) const
         buffer[3 * index + 2] = b_byte;
     };
 
-    if (buffer.size() != image_width * image_height * 3)
-    {
+    if (buffer.size() != config.image_width * image_height * 3) {
         log("Incorrect buffer size. Not rendering.");
         return;
     }
@@ -136,13 +138,13 @@ void Camera::render_to_buffer(std::span<u8> buffer, const Hittable &world) const
     auto thread_id = std::this_thread::get_id();
     for (int y = 0; y < image_height; ++y) {
         log("Thread {}. Scanlines remaining: {}", thread_id, image_height - y);
-        for (int x = 0; x < image_width; ++x) {
+        for (int x = 0; x < config.image_width; ++x) {
             auto pixel_color = Color{0.0f};
-            for (int sample = 0; sample < samples_per_pixel; ++sample) {
+            for (int sample = 0; sample < config.samples_per_pixel; ++sample) {
                 auto ray = get_ray(x, y);
-                pixel_color += ray_color(ray, max_depth, world);
+                pixel_color += ray_color(ray, config.max_depth, world);
             }
-            write_color(buffer, y * image_width + x, pixel_samples_scale * pixel_color);
+            write_color(buffer, y * config.image_width + x, pixel_samples_scale * pixel_color);
         }
     }
     log("{} done.", thread_id);
@@ -159,7 +161,7 @@ Ray Camera::get_ray(int x, int y) const {
 
     auto offset = sample_square();
     auto pixel_sample = pixel00_location + (x+offset.x)*pixel_delta_u + (y+offset.y)*pixel_delta_v;
-    auto ray_origin = origin + defocus_disk_sample();
+    auto ray_origin = config.origin + defocus_disk_sample();
     auto ray_direction = pixel_sample - ray_origin;
     auto ray_time = random_f32();
     return Ray{ray_origin, ray_direction, ray_time};

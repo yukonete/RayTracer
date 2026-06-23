@@ -6,6 +6,7 @@
 
 struct Material {
     virtual bool scatter(const Ray &r_in, const HitRecord &rec, Color &attenuation, Ray &scattered) const = 0;
+    virtual ~Material() = default;
 };
 
 struct Lambertian : public Material {

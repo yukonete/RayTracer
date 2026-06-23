@@ -1,15 +1,74 @@
+#include <cmath>
+#include <string_view>
+#include <thread>
+#include <vector>
+
 #include "BVH.h"
 #include "Camera.h"
 #include "Hittable.h"
+#include "Image.h"
 #include "Material.h"
 #include "RtWeekend.h"
 #include "Sphere.h"
+#include "flag.hpp"
 #include "stb_image_write.h"
-#include <cmath>
-#include <string>
-#include <vector>
 
-static int thread_count = 1;
+struct Args {
+    int scene = 0;
+    int thread_count = 0;
+    std::string_view out;
+    bool help = false;
+
+    static std::optional<Args> parse(int argc, char **argv) {
+        auto &scene =
+            *FlagHpp::flag_int<int>("scene", 1, "Which scene to render.");
+        auto &thread_count = *FlagHpp::flag_int<int>(
+            "threads", std::thread::hardware_concurrency(),
+            "How many threads to use for rendering.");
+        auto &out =
+            *FlagHpp::flag_string("out", "output.png", "Output file name.");
+        auto &help =
+            *FlagHpp::flag_bool("help", false, "Show this help message.");
+
+        if (!FlagHpp::parse(argc, argv) || out.empty()) {
+            if (out.empty()) {
+                std::println("out can not be an empty string");
+            }
+            FlagHpp::print_usage(stdout);
+            return {};
+        }
+
+        return Args{
+            .scene = scene,
+            .thread_count = thread_count,
+            .out = out,
+            .help = help,
+        };
+    }
+};
+
+static Args args = {};
+
+//static Camera::Config camera_config = {
+//    .aspect_ratio = 16.0f / 9.0f,
+//    .image_width = 960,
+//    .samples_per_pixel = 400,
+//    .max_depth = 50,
+//};
+
+static Camera::Config camera_config = {
+    .aspect_ratio = 16.0f / 9.0f,
+    .image_width = 100,
+    .samples_per_pixel = 10,
+    .max_depth = 10,
+};
+
+static RenderedFrame render(const Hittable &world,
+                            const Camera::Config &config) {
+    Camera camera{config};
+    camera.init();
+    return camera.render(world, args.thread_count);
+}
 
 static RenderedFrame bouncing_spheres() {
     Arena arena;
@@ -65,25 +124,18 @@ static RenderedFrame bouncing_spheres() {
     hittables.push_back(
         arena.push_item<Sphere>(Vec3{4.0f, 1.0f, 0.0f}, 1.0f, material3));
 
-    auto world = arena.push_item<BVHNode>(&arena, hittables);
+    auto world = BVHNode{&arena, hittables};
 
-    Camera camera{};
-    camera.aspect_ratio = 16.0f / 9.0f;
-    camera.image_width = 960;
-    camera.samples_per_pixel =
-        static_cast<int>(std::ceilf(100.0f / static_cast<f32>(thread_count)));
-    camera.max_depth = 50;
+    auto config = camera_config;
+    config.vertical_fov = 20;
+    config.origin = Vec3{13.0f, 2.0f, 3.0f};
+    config.lookat = Vec3{0.0f, 0.0f, 0.0f};
+    config.up = Vec3{0.0f, 1.0f, 0.0f};
 
-    camera.vertical_fov = 20;
-    camera.origin = Vec3{13.0f, 2.0f, 3.0f};
-    camera.lookat = Vec3{0.0f, 0.0f, 0.0f};
-    camera.up = Vec3{0.0f, 1.0f, 0.0f};
+    config.defocus_angle = 0.6f;
+    config.focus_dist = 10.0f;
 
-    camera.defocus_angle = 0.6f;
-    camera.focus_dist = 10.0f;
-
-    camera.init();
-    return camera.render(*world, thread_count);
+    return render(world, config);
 }
 
 static RenderedFrame checked_spheres() {
@@ -91,87 +143,85 @@ static RenderedFrame checked_spheres() {
 
     auto hittables = std::vector<Hittable *>{};
 
-    auto checker_texture = arena.push_item<CheckerTexture>(
-        0.32f, arena.push_item<SolidColor>(Color{0.2f, 0.3f, 0.1f}),
-        arena.push_item<SolidColor>(Color{0.9f, 0.9f, 0.9f}));
-    auto material = arena.push_item<Lambertian>(checker_texture);
+    auto checker_texture = arena.push_item(CheckerTexture{
+        0.32f, arena.push_item(SolidColor{Color{0.2f, 0.3f, 0.1f}}),
+        arena.push_item(SolidColor{Color{0.9f, 0.9f, 0.9f}})});
+    auto material = arena.push_item(Lambertian{checker_texture});
 
     hittables.push_back(
-        arena.push_item<Sphere>(Vec3{0.0f, -10.0f, 0.0f}, 10.0f, material));
+        arena.push_item(Sphere{Vec3{0.0f, -10.0f, 0.0f}, 10.0f, material}));
     hittables.push_back(
-        arena.push_item<Sphere>(Vec3{0.0f, 10.0f, 0.0f}, 10.0f, material));
+        arena.push_item(Sphere{Vec3{0.0f, 10.0f, 0.0f}, 10.0f, material}));
 
-    auto world = arena.push_item<BVHNode>(&arena, hittables);
+    auto world = BVHNode{&arena, hittables};
 
-    Camera camera{};
-    camera.aspect_ratio = 16.0f / 9.0f;
-    camera.image_width = 960;
-    camera.samples_per_pixel =
-        static_cast<int>(std::ceilf(100.0f / static_cast<f32>(thread_count)));
-    camera.max_depth = 50;
+    auto config = camera_config;
+    config.vertical_fov = 20;
+    config.origin = Vec3{13.0f, 2.0f, 3.0f};
+    config.lookat = Vec3{0.0f, 0.0f, 0.0f};
+    config.up = Vec3{0.0f, 1.0f, 0.0f};
 
-    camera.vertical_fov = 20;
-    camera.origin = Vec3{13.0f, 2.0f, 3.0f};
-    camera.lookat = Vec3{0.0f, 0.0f, 0.0f};
-    camera.up = Vec3{0.0f, 1.0f, 0.0f};
-
-    camera.defocus_angle = 0.0f;
-
-    camera.init();
-    return camera.render(*world, thread_count);
+    return render(world, config);
 }
 
-RenderedFrame earth() {
-	Arena arena;
+static RenderedFrame earth() {
+    auto earth_image = Image::load("earthmap.jpg");
+    auto image_texture = ImageTexture{&earth_image};
+    auto earth_material = Lambertian{&image_texture};
+    auto globe = Sphere{Vec3{0.0f}, 2.0f, &earth_material};
 
-	auto earth_image = Image::load("earthmap.jpg");
-	auto image_texture = ImageTexture{&earth_image};
-	auto earth_material = Lambertian{&image_texture};
-	auto globe = Sphere{Vec3{0.0f}, 2.0f, &earth_material};
+    auto config = camera_config;
+    config.vertical_fov = 20.0f;
+    config.origin = Vec3{0.0f, 0.0f, 12.0f};
+    config.lookat = Vec3{0.0f, 0.0f, 0.0f};
+    config.up = Vec3{0.0f, 1.0f, 0.0f};
 
-	Camera camera{};
-    camera.aspect_ratio = 16.0f / 9.0f;
-    camera.image_width = 960;
-    camera.samples_per_pixel =
-        static_cast<int>(std::ceilf(100.0f / static_cast<f32>(thread_count)));
-    camera.max_depth = 50;
+    return render(globe, config);
+}
 
-    camera.vertical_fov = 20;
-    camera.origin = Vec3{0.0f, 0.0f, 12.0f};
-    camera.lookat = Vec3{0.0f, 0.0f, 0.0f};
-    camera.up = Vec3{0.0f, 1.0f, 0.0f};
+static RenderedFrame perlin_spheres() {
+    Arena arena;
 
-    camera.defocus_angle = 0.0f;
+    std::vector<Hittable *> hittables;
 
-    camera.init();
-    return camera.render(globe, thread_count);
+    auto pertext = NoiseTexture{4.0f};
+    auto material = Lambertian{&pertext};
+
+    hittables.push_back(arena.push_item(
+        Sphere{Vec3(0.0f, -1000.0f, 0.0f), 1000.0f, &material}));
+    hittables.push_back(
+        arena.push_item(Sphere{Vec3(0.0f, 2.0f, 0.0f), 2.0f, &material}));
+
+    auto world = BVHNode{&arena, hittables};
+
+    auto config = camera_config;
+    config.vertical_fov = 20.0f;
+    config.origin = Vec3(13.0f, 2.0f, 3.0f);
+    config.lookat = Vec3(0.0f, 0.0f, 0.0f);
+    config.up = Vec3(0.0f, 1.0f, 0.0f);
+
+    return render(world, config);
 }
 
 int main(int argc, char *argv[]) {
-    int scene = 3;
-    if (argc > 1) {
-        try {
-            scene = std::stoi(argv[1]);
-        } catch (...) {
-            log("Cound not parse scene number.");
-        }
-        if (argc > 2) {
-            try {
-                int threads_requested = std::stoi(argv[2]);
-                if (threads_requested > 1) {
-                    thread_count = threads_requested;
-                } else {
-                    log("Number of threads should be >= 1.");
-                }
-            } catch (...) {
-                log("Cound not parse number of threads.");
-            }
-        }
+    auto args = Args::parse(argc, argv).or_else([]() -> std::optional<Args> {
+        std::exit(1);
+    }).value();
+
+    if (args.help) {
+        FlagHpp::print_usage(stdout);
+        return 0;
     }
-    log("Running with {} threads.", thread_count);
+
+    camera_config.samples_per_pixel = static_cast<int>(
+        std::ceil(static_cast<f32>(camera_config.samples_per_pixel) /
+                  static_cast<f32>(args.thread_count)));
+
+    log("Running with {} threads.", args.thread_count);
+    log("Selected scene is {}.", args.scene);
 
     RenderedFrame image;
-    switch (scene) {
+    switch (args.scene) {
         case 1: {
             image = bouncing_spheres();
             break;
@@ -180,16 +230,20 @@ int main(int argc, char *argv[]) {
             image = checked_spheres();
             break;
         }
-		case 3: {
+        case 3: {
             image = earth();
             break;
         }
+        case 4: {
+            image = perlin_spheres();
+            break;
+        }
         default: {
-            log("Scene with number {} does not exists.", scene);
+            log("Scene with number {} does not exists.", args.scene);
             return 1;
         }
     }
 
-    stbi_write_png("output.png", image.image_width, image.image_height, 3,
+    stbi_write_png(args.out.data(), image.image_width, image.image_height, 3,
                    image.data.data(), image.image_width * 3);
 }
